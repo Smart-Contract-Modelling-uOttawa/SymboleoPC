@@ -104,4 +104,4 @@ Constraints
 endContract
 ```
 # Installation
-Follow [installation instruction](https://github.com/Smart-Contract-Modelling-uOttawa/SymboleoPC/edit/main/INSTALL.md) to install SymboleoPC.
+Follow [installation instruction](https://github.com/Smart-Contract-Modelling-uOttawa/SymboleoPC/blob/main/INSTALL.md) to install SymboleoPC.
