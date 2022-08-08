@@ -47,6 +47,7 @@ VAR
  -- Global contract properties
 LTLSPEC NAME LTL1 := F(pizza_cnt.cnt.state = sTermination | pizza_cnt.cnt.state = unsTermination);
 ```
+Download nuXmv file from [here](https://nuxmv.fbk.eu/).
 
 Run the model checker using the below command.
 ```
