@@ -3,7 +3,7 @@
 // * legal contract model checking module generator
 // */
 package ca.uottawa.csmlab.symboleo.generator
-
+import java.util.ArrayList
 import ca.uottawa.csmlab.symboleo.symboleo.DomainType
 import ca.uottawa.csmlab.symboleo.symboleo.RegularType
 import java.util.List
@@ -99,6 +99,13 @@ import ca.uottawa.csmlab.symboleo.symboleo.PointAtomPowerEvent
 import ca.uottawa.csmlab.symboleo.symboleo.PredicateFunctionWHappensBefore
 import ca.uottawa.csmlab.symboleo.symboleo.PredicateFunctionSHappensBefore
 import ca.uottawa.csmlab.symboleo.symboleo.PredicateFunctionWHappensBeforeEvent
+import ca.uottawa.csmlab.symboleo.symboleo.AssignExpression
+import ca.uottawa.csmlab.symboleo.symboleo.OAssignExpression
+import ca.uottawa.csmlab.symboleo.symboleo.Assignment
+import ca.uottawa.csmlab.symboleo.symboleo.OAssignment
+import ca.uottawa.csmlab.symboleo.symboleo.PredicateFunctionAssignmentOnly
+import ca.uottawa.csmlab.symboleo.symboleo.PredicateFunctionAssignment
+import java.util.concurrent.TimeUnit
 
 enum predicateType{
 		HAPPENS, WHAPPENSBEFORE, SHAPPENSBEFORE, HAPPENSAFTER, HAPPENSWITHIN
@@ -201,6 +208,7 @@ class SymboleoPCGenerator {
 	val obligations = new ArrayList<Obligation>
 	val powers = new ArrayList<Power>
 	val constraints = new ArrayList<Proposition>
+	 val AssignCase = new HashMap<String, String>
 	
 	val predicates = new ArrayList<SymboleoPredicate>
 	
@@ -218,6 +226,7 @@ class SymboleoPCGenerator {
 	
 	val pcSurvivingObligations = new ArrayList<String>
 	val pcVariables = new ArrayList<DeclarationVariable>
+	val inVar = new ArrayList<DeclarationVariable>
 	val pcSituations = new ArrayList<String>
 	val pcRoles = new ArrayList<String>
 	val pcAssets = new ArrayList<String>
@@ -226,7 +235,7 @@ class SymboleoPCGenerator {
 	val pcParameters =  new ArrayList<String>
 	val pcConstraints = new ArrayList<String>
 	val pcAssignProhibitedNorms = new ArrayList<String>
-	
+	 val pcAssignVar= new ArrayList<String>
 	// transfer a contract meta model to proper data structures
 	def void parse (Model model) {
 		parameters.addAll(model.parameters)
@@ -326,7 +335,7 @@ class SymboleoPCGenerator {
 			constraintEvents.add(collectPropositionEvents(constr))
 			constraints.add(constr)
 		}
-		generateHappenVariables()
+		generateHappenVariables(model)
 	}
 	
 	def RegularType getBaseType(DomainType domainType) {
@@ -349,6 +358,16 @@ class SymboleoPCGenerator {
 			PredicateFunctionSHappensBefore: return '''«extractEventVariableString(predicate.event)»'''
 			PredicateFunctionHappensAfter: return '''«extractEventVariableString(predicate.event)»'''
 			PredicateFunctionHappensWithin: return '''«extractEventVariableString(predicate.event)»'''
+			PredicateFunctionAssignment: return '''«extractEventVariableString(predicate.event)»'''
+	        PredicateFunctionAssignmentOnly: return '''TRUE'''
+		}	
+	}
+def boolean ifAssign(PredicateFunction predicate){
+		switch (predicate){
+		PredicateFunctionAssignment:return true
+	     PredicateFunctionAssignmentOnly: return true
+	     default: return false
+	
 		}	
 	}
 	
@@ -369,7 +388,10 @@ class SymboleoPCGenerator {
 			case "expired": return "expirtion"
 			case "fulfilled": return "fulfillment"
 			case "terminated": return "termination"			
-			case "revokedParty": return "unassign"				
+			case "revokedParty": return "unassign"	
+			case "activated": return "inEffect"		
+			case "triggered":	return "active"
+			default: print("Not considered event="+event)
 		}
 	}
 	
@@ -390,7 +412,7 @@ class SymboleoPCGenerator {
 		return false
 	}
 	
-	def void generateHappenVariables() {
+	def void generateHappenVariables(Model model) {
 		// merge predicates and remove duplicates
 		var atoms = new ArrayList<PredicateFunction>()
 		
@@ -467,6 +489,34 @@ class SymboleoPCGenerator {
 		       					addVariable("hbefore_" + pair1.value + "_" + pair2.value, null, "WhappensBefore", pairs)
 		       				}
 		       			}
+		       			///////////////
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				val pair1 = new Pair("event1", generateEventVariableString(it.event))
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				//val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val pv = pexp.value
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2=generateDotExpressionString(pp.variable, null)
+								// Here we can change the value as datetime variabl:datetime_to_string( datetime_plus_days(datetime_from_string(request.date), 10))
+								val pair2 = new Pair("event2", eventN2+" + "+ UnifyTime(t,pexp.timeUnit, model))
+								// "hbefore_" +eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+								if(!isDuplicate(pair1.value, pair2.value, 'WhappensBefore')) {
+		       					var pairs = new ArrayList<Pair<String, String>>()
+		       					pairs.add(pair1)
+		       					pairs.add(pair2)
+		       					val eventN2_=eventN2.replace('.', '_')
+		       					addVariable("hbefore_" + pair1.value + "_" + eventN2_+"_"+t+"_"+pexp.timeUnit, null, "WhappensBefore", pairs)
+		       				}	
+		       				
+	       					//	return "hbefore_" + eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
+	       			}
+		       			///////////////
 	       				PointAtomContractEvent: {
 	       					val pair1 = new Pair("event1", generateEventVariableString(it.event))
 	       					val pair2 = new Pair("event2", generateEventVariableString(pexp.contractEvent))
@@ -546,7 +596,7 @@ class SymboleoPCGenerator {
 		       					pairs.add(pair1)
 		       					pairs.add(pair2)
 		       					addVariable("hbefore_" + pair1.value + "_" + pair2.value, null, "ShappensBefore", pairs)	       					
-	       					}
+	       					}     
 	       				}
 	       				PointAtomObligationEvent: {
 	       					val pair1 = new Pair("event1", generateEventVariableString(it.event))
@@ -568,6 +618,33 @@ class SymboleoPCGenerator {
 		       					addVariable("hbefore_" + pair1.value + "_" + pair2.value, null, "ShappensBefore", pairs)
 		       				}
 		       			}
+		       			
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				val pair1 = new Pair("event1", generateEventVariableString(it.event))
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				//val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val pv = pexp.value
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2=generateDotExpressionString(pp.variable, null)
+								// Here we can change the value as datetime variabl: datetime_to_string((datetime_plus_days(datetime_from_string(request.date), 10)
+								val pair2 = new Pair("event2", eventN2+" + "+ UnifyTime(t,pexp.timeUnit, model))
+								// "hbefore_" +eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+								if(!isDuplicate(pair1.value, pair2.value, 'ShappensBefore')) {
+		       					var pairs = new ArrayList<Pair<String, String>>()
+		       					pairs.add(pair1)
+		       					pairs.add(pair2)
+		       					eventN2.replace('.', '_')
+		       					addVariable("hbefore_" + pair1.value + "_" + eventN2+"_"+t+"_"+pexp.timeUnit, null, "ShappensBefore", pairs)
+		       				}	
+		       				
+	       					//	return "hbefore_" + eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
+	       			}
 	       				PointAtomContractEvent: {
 	       					val pair1 = new Pair("event1", generateEventVariableString(it.event))
 	       					val pair2 = new Pair("event2", generateEventVariableString(pexp.contractEvent))
@@ -590,7 +667,7 @@ class SymboleoPCGenerator {
 	       					val pair2 = new Pair("event2", generateDotExpressionString(pexp.variable, null))
 	       					
 	       					if(!isDuplicate(pair1.value, pair2.value, 'HappensAfter')) {
-		       					var pairs = new ArrayList<Pair<String, String>>()
+		       					var pairs = new ArrayList<Pair<String, String>>()         
 		       					pairs.add(pair1)
 		       					pairs.add(pair2)
 		       					addVariable("hafter_" + pair1.value + "_" + pair2.value, null, "HappensAfter", pairs)	       					
@@ -616,6 +693,33 @@ class SymboleoPCGenerator {
 		       					addVariable("hafter_" + pair1.value + "_" + pair2.value, null, "HappensAfter", pairs)
 		       				}
 		       			}
+		       			
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				val pair1 = new Pair("event1", generateEventVariableString(it.event))
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				//val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val pv = pexp.value
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2=generateDotExpressionString(pp.variable, null)
+								// Here we can change the value as datetime variabl: datetime_plus_days(datetime_from_string(request.date), 10)
+								val pair2 = new Pair("event2", eventN2+" + "+ UnifyTime(t,pexp.timeUnit, model))
+								// "hbefore_" +eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+								if(!isDuplicate(pair1.value, pair2.value, 'HappensAfter')) {
+		       					var pairs = new ArrayList<Pair<String, String>>()
+		       					pairs.add(pair1)
+		       					pairs.add(pair2)
+		       					val eventN2_=eventN2.replace('.', '_')
+		       					addVariable("hafter_" + pair1.value + "_" + eventN2_+"_"+t+"_"+pexp.timeUnit, null, "HappensAfter", pairs)
+		       				}	
+		       				
+	       					//	return "hbefore_" + eventN1 + "_" + eventN2+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
+	       			}
 	       				PointAtomContractEvent: {
 	       					val pair1 = new Pair("event1", generateEventVariableString(it.event))
 	       					val pair2 = new Pair("event2", generateEventVariableString(pexp.contractEvent))
@@ -1175,6 +1279,7 @@ class SymboleoPCGenerator {
 			PowerEvent: return '''«event.eventName.toLowerCase»'''
 			ObligationEvent: return '''«event.eventName.toLowerCase»'''
 			ContractEvent: return '''«event.eventName.toLowerCase»'''
+			default: return ''''''
 		}	
 	}
 	
@@ -1221,9 +1326,24 @@ class SymboleoPCGenerator {
 	       					val eventN2 = generateEventVariableString(pexp.contractEvent)
 	       					return "hbefore_" + eventN1 + "_" + eventN2
 		       			}
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val intV=pexp.value 
+		       				val pv = pexp.value
+			
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2_=eventN2.replace('.', '_')
+	       						return "hbefore_" + eventN1 + "_" + eventN2_+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
 	       			}
 	       }
-	       
+	       }
 	       	if(it instanceof PredicateFunctionSHappensBefore){
 	       		val point = it.point
 	       			val pexp = point.pointExpression
@@ -1248,6 +1368,22 @@ class SymboleoPCGenerator {
 	       					val eventN2 = generateEventVariableString(pexp.contractEvent)
 	       					return "hbefore_" + eventN1 + "_" + eventN2
 		       			}
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val intV=pexp.value 
+		       				val pv = pexp.value
+			
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2_=eventN2.replace('.', '_')
+	       						return "hbefore_" + eventN1 + "_" + eventN2_+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
+	       			}
 	       			}
 	       }
 	       
@@ -1275,10 +1411,28 @@ class SymboleoPCGenerator {
 	       					val eventN2 = generateEventVariableString(pexp.contractEvent)
 	       					return "hafter_" + eventN1 + "_" + eventN2
 		       			}
+		       			
+		       			PointFunction:{ // added by Amal to deal with whappenbefor(event, date.add(paid.date,10,Days))
+		       			val pp= pexp.arg
+		       				val eventN1 = generateEventVariableString(it.event)
+		       				if (pp instanceof PointAtomParameterDotExpression){
+		       				val eventN2 = generateDotExpressionString(pp.variable, null)
+		       				val intV=pexp.value 
+		       				val pv = pexp.value
+			
+							if(pv instanceof TimevalueInt) {
+								val t = pv.value;
+								val eventN2_=eventN2.replace('.', '_')
+	       						return "hafter_" + eventN1 + "_" + eventN2_+"_"+t+"_"+pexp.timeUnit
+		       				//return "HappensBefor"
+		       				}
+		       			}
 	       			}
+	       			}
+	       			
 	       }
 	}
-	
+	// Amal added assign and assignonly no modification
 	def String generatePredicateFunctionString(String normName, normType nType, propositionType pType, PredicateFunction predicate){		
 		switch (predicate){
 			PredicateFunctionHappens: {
@@ -1290,6 +1444,17 @@ class SymboleoPCGenerator {
 									ContractEvent: return '''«generateEventVariableString(predicate.event)»'''
 								}								
 							}
+			PredicateFunctionAssignment:{
+				predicates.add(new SymboleoPredicate(predicateType.HAPPENS, extractEventVariableString(predicate.event)))
+							switch (predicate.event) {
+									VariableEvent: return '''«generateProposition(normName, nType, pType, generateEventVariableString(predicate.event))»'''
+									PowerEvent: return '''«generateEventVariableString(predicate.event)»'''
+									ObligationEvent: return '''«generateEventVariableString(predicate.event)»'''		
+									ContractEvent: return '''«generateEventVariableString(predicate.event)»'''
+									
+									}
+			}
+	     	PredicateFunctionAssignmentOnly: return "TRUE"
 			PredicateFunctionWHappensBefore: {	
 				return getHappensPredicateVarName(predicate) + "._true"	
 			}
@@ -1357,6 +1522,8 @@ class SymboleoPCGenerator {
 			PAtomDoubleLiteral: return proposition.value.toString
 			PAtomIntLiteral: return proposition.value.toString
 			PAtomStringLiteral: return proposition.value
+			//PredicateFunctionAssignment:return true
+	     	//PredicateFunctionAssignmentOnly: return "TRUE"
 		}
 	}
 	
@@ -1421,8 +1588,8 @@ class SymboleoPCGenerator {
 			PrimaryExpressionRecursive: return "(" + generateExpressionString(argExpression.inner, thisString) + ")"
 			PrimaryExpressionFunctionCall: return generateFunctionCall(argExpression, thisString)
 			NegatedPrimaryExpression: return "!(" + generateExpressionString(argExpression.expression, thisString) + ")"
-			AtomicExpressionTrue: return "true"
-			AtomicExpressionFalse: return "false"
+			AtomicExpressionTrue: return "TRUE"
+			AtomicExpressionFalse: return "FALSE"
 			AtomicExpressionDouble: return argExpression.value.toString()
 			AtomicExpressionInt: return argExpression.value.toString()
 			AtomicExpressionEnum: return argExpression.enumeration + "." + argExpression.enumItem
@@ -1729,7 +1896,7 @@ class SymboleoPCGenerator {
 		 	ASSIGN
 		   		init(state) := not_happened;
 		    	next(state) := case
-					state = not_happened & event1.event._active & next(event1.event._happened) & !(next(event2_happened)) : ev1_happened;
+					state = not_happened & event1.event._active & next(event1.event._happened) & !(next(event2.event._happened)) : ev1_happened;
 					state = ev1_happened & event2.event._active & next(event2.event._happened) : ev1_ev2_happened;
 					TRUE : state;
 		 esac;
@@ -2027,10 +2194,20 @@ class SymboleoPCGenerator {
 				--------------
 				«compileParties()»
 				
+				-----------------------
+				-- IMPLICIT CONSTRAINTS
+				-----------------------
+				«implicitConstraints()»
+				
 				--------------
 				-- CONSTRAINTS
 				--------------
 				«compileConstraints(cntPrecondition)»
+				
+				--------------
+				-- Assignment
+				--------------
+				«AssignWorkdef(model)»
 		'''
 		fsa.generateFile("./domain/contracts/" + model.contractName + ".smv", code)
 	}	
@@ -2293,6 +2470,7 @@ class SymboleoPCGenerator {
 					if(assignment instanceof AssignExpression)
 						assgs.add(new Pair(assignment.name, generateExpressionString(assignment.value, null)))						
 						}
+						
 			addVariable(variable.name, situation, variable.type.name, assgs)
 		}
 	}
@@ -2303,7 +2481,9 @@ class SymboleoPCGenerator {
 		
 		// translate implicit variables
 		var code = ""
+		
 		for(variable : pcVariables) {
+			
 			var params = ""
 			if(variable.starter !== null)
 				params += variable.starter
@@ -2314,8 +2494,10 @@ class SymboleoPCGenerator {
 						params += ", " + param.value
 					else
 						params += param.value
-				}			
-			code += variable.name + " :" + variable.type + "(" + params + ");\n\n"
+					//	if 	(param instanceof role)
+				}	
+					
+			code += variable.name + " : " + variable.type + "(" + params + ");\n\n"
 		}
 		return code;
 	}
@@ -2406,14 +2588,14 @@ class SymboleoPCGenerator {
 	def String compileParties() {
 		val code = '''		
 		«FOR obligation:obligations»
-			«obligation.name»_debtor : Party(«obligation.name»._name, «generateDotExpressionString(obligation.debtor, null)».party, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE);
-			«obligation.name»_creditor : Party(«obligation.name»._name, «generateDotExpressionString(obligation.creditor, null)».party, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE);
+			«obligation.name»_debtor : Party(«obligation.name»._name, «generateDotExpressionString(obligation.debtor, null)».role._party, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE);
+			«obligation.name»_creditor : Party(«obligation.name»._name, «generateDotExpressionString(obligation.creditor, null)».role._party, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE);
 			
 		«ENDFOR»
 		
 		«FOR power:powers»
-			«power.name»_debtor : Party(«power.name»._name, «generateDotExpressionString(power.debtor, null)».party, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE);
-			«power.name»_creditor : Party(«power.name»._name, «generateDotExpressionString(power.creditor, null)».party, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE);
+			«power.name»_debtor : Party(«power.name»._name, «generateDotExpressionString(power.debtor, null)».role._party, FALSE, TRUE, FALSE, FALSE, FALSE, TRUE);
+			«power.name»_creditor : Party(«power.name»._name, «generateDotExpressionString(power.creditor, null)».role._party, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE);
 			
 		«ENDFOR»
 		'''
@@ -2540,5 +2722,303 @@ class SymboleoPCGenerator {
 		for (e : resource.allContents.toIterable.filter(Model)) {
 			generatePCSource(fsa, e)
 		}
+	}
+	
+	def String AssignWorkdef(Model model) {  // generateEventInitSituation
+		var List<String> situations = new ArrayList<String>()
+		var String situation = "";
+			
+		for(obligation: model.obligations) {
+			var propositions = obligationAntecedentEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {	
+					if (ifAssign(p.predicateFunction)){			
+						situations.add(generatePropositionAssignString(obligation.antecedent,obligation.name + ".state=inEffect"))					
+					
+					}
+				}	
+			
+			propositions = obligationConsequentEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {
+					if (ifAssign(p.predicateFunction)){
+						situations.add(generatePropositionAssignString(p,obligation.name + ".state=fulfillment"))
+					}	
+					}
+					
+				
+			
+			propositions = obligationTriggerEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {
+					if (ifAssign(p.predicateFunction)){
+					//var ev = getEvent(p.predicateFunction)
+				//	if(ev.equals(eventName)){
+						situations.add(generatePropositionAssignString(p,"cnt.state=inEffect"))
+				//	}
+					}
+				}		
+		}
+		
+		for(obligation: model.survivingObligations) {
+			var propositions = obligationAntecedentEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {	
+					if (ifAssign(p.predicateFunction)){			
+					// var ev = getEvent(p.predicateFunction)
+					//if(ev.equals(eventName)){
+						situations.add(generatePropositionAssignString(p,obligation.name + ".state=inEffect"))	
+						
+					//	}				
+					}
+				}	
+			
+			propositions = obligationConsequentEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {
+					if (ifAssign(p.predicateFunction)){
+					//var ev = getEvent(p.predicateFunction)
+				//	if(ev==eventName){
+						situations.add(generatePropositionAssignString(p,obligation.name + ".state=fulfillment"))
+						
+					//	}
+					}	
+				}	
+			
+			propositions = obligationTriggerEvents.get(obligation)
+			if(propositions !== null)
+				for(p : propositions) {
+					if (ifAssign(p.predicateFunction)){
+					//var ev = getEvent(p.predicateFunction)
+				//	if(ev==eventName){
+						situations.add(generatePropositionAssignString(p,"cnt.state=inEffect"))
+						
+					//	}
+					}
+				}		
+		}
+		
+    for(power: model.powers) {
+			var propositions = obligationAntecedentEvents.get(power)
+			if(propositions !== null)
+				for(p : propositions) {	
+					if (ifAssign(p.predicateFunction)){			
+					//var ev = getEvent(p.predicateFunction)
+					//if(ev.equals(eventName)){
+						situations.add(generatePropositionAssignString(power.antecedent,power.name + ".state=inEffect"))					
+					//}
+					
+					}
+				}	
+				
+				}
+			
+		/*for(s : situations) {
+			if(situation === ""){
+				situation = s;
+			}
+			else{
+				situation += " \n " + s;
+			}
+		}*/
+		for(String key : AssignCase.keySet()){
+			situation+="\n "+AssignCase.get(key)+"\n TRUE :"+key + ";\n" + "esac;" 
+		}
+		return situation
+	}
+	
+	  def String generatePropositionAssignString(Proposition proposition, String cond) {
+  	 switch (proposition) {
+    	POr:
+        return generatePropositionAssignString(proposition.left, cond) +  generatePropositionAssignString(proposition.right, cond)
+      PAnd:
+        return generatePropositionAssignString(proposition.left, cond) + generatePropositionAssignString(proposition.right, cond)
+      PEquality:
+        return generatePropositionAssignString(proposition.left, cond) + 
+          generatePropositionAssignString(proposition.right, cond)
+      PComparison:
+        return generatePropositionAssignString(proposition.left, cond) +  generatePropositionAssignString(proposition.right, cond)
+      PAtomRecursive:
+        return generatePropositionAssignString(proposition.inner, cond) 
+      NegatedPAtom:
+        return generatePropositionAssignString(proposition.negated, cond) 
+      PAtomPredicate:
+        return generatePredicateAssignString(proposition.predicateFunction, cond)
+      default : return " "
+    }
+  }
+  def String generatePredicateAssignString(PredicateFunction predicate, String cond) {
+    switch (predicate) {
+      PredicateFunctionAssignment: return ''' «generateOAssignObjectString(predicate.assignment, generateEventVariableString(predicate.event), cond)» '''
+       PredicateFunctionAssignmentOnly: return ''' «generateOAssignObjectString(predicate.assignment,"", cond)» '''
+      default : return " "	
+    }
+  }
+	def String generateOAssignObjectString(List<OAssignment> a, String hap, String cond) {
+  	var s = ""
+  	var eName=""
+  	var hapc=""
+  	if (hap!=""){hapc=hap+".event._happened & "}
+		for(e: a){
+		   if (e instanceof OAssignExpression){
+		   	 eName=generateDotExpressionString(e.name2,null )
+           s= s+"ASSIGN \n next("+eName+ ") := case " + hapc+cond+":"+generateExpressionString(e.value, null)+"; TRUE:"+eName+"; esac;"
+           // s= generateExpressionString(a.name, 'contract' )+ OpString(a.op) + generateExpressionString(a.value, 'contract')
+          s=s+" \n"
+          if (!AssignCase.containsKey(eName))
+                 AssignCase.put(eName,"ASSIGN \n next("+eName+ ") := case \n" + hapc+cond+" : "+generateExpressionString(e.value, null)+";")
+              else AssignCase.put(eName,AssignCase.get(eName)+"\n"+hapc+cond+" : "+generateExpressionString(e.value, null)+";")
+          }
+        }
+  	return s
+  	
+  }
+  
+  def String UnifyTime(Integer t, String timeUnit, Model model){
+  	    // val compU = Integer.parseInt(t)
+  	     
+  	      if (timeUnit== model.timeUnits) {
+  	      	return String.valueOf(t)
+  	      	}
+		switch (model.timeUnits){
+			case 'seconds' : {
+				switch (timeUnit){
+				        case 'minutes':{return String.valueOf(t*60)}
+				        case 'hours': {return String.valueOf(t * 60*60)}
+				        case 'days':{return String.valueOf(t * 60*60*24)}
+				        case 'weeks' :{return String.valueOf(t * 60*60*24*7)}
+				        default: return {'undefined'}
+				        }
+				        }
+			
+			case 'minutes': {
+				switch (timeUnit){
+				        case 'seconds':{return String.valueOf(t/60)}
+				        case 'hours': {return String.valueOf(t * 60)}
+				        case 'days':{return String.valueOf(t * 60*24)}
+				        case 'weeks' :{return String.valueOf(t * 60*24*7)}
+				        default: return {'undefined'}
+				        }
+				        }
+            case 'hours' :{
+				switch (timeUnit){
+					    case 'seconds':{return String.valueOf(t/120)}
+				        case 'minutes':{return String.valueOf(t/60)}
+				        case 'days':{return String.valueOf(t * 24)}
+				        case 'weeks' :{return String.valueOf(t *24*7)}
+				        default: return {'undefined'}
+				        }
+				        }
+            case 'days' : {
+				switch (timeUnit){
+					    case 'seconds':{return String.valueOf(t/(120*24))}
+				        case 'hours':{return String.valueOf(t/24)}
+				        case 'minutes':{return String.valueOf(t /(60*24))}
+				        case 'weeks' :{return String.valueOf(t *7)}
+				        default: return {'undefined'}
+				        }
+				        }
+            case 'weeks' :{
+				switch (timeUnit){
+					    case 'seconds':{return String.valueOf(t/(120*24*7))}
+				        case 'hours':{return String.valueOf(t/(24*7))}
+				        case 'minutes':{return String.valueOf(t /(60*24*7))}
+				        case 'days' :{return String.valueOf(t /7)}
+				        default: return {'undefined'}
+				        }
+				        }
+            case 'months': if (timeUnit=='years'){return String.valueOf(t*12)}
+            case 'years': if (timeUnit=='months'){return String.valueOf(t/12)}
+            default: return {'undefined'}
+			
+		}
+			
+	}
+ def String implicitConstraints(){
+ 	    val typeVar= new ArrayList<String>
+ 	     typeVar.add("HappensAfter")
+ 	     typeVar.add( "WhappensBefore")
+ 	     typeVar.add("ShappensBefore")
+ 	     typeVar.add("HappensWithin")
+  	    var imp = ""
+  	    var last=0
+  	    var first=0
+  	    for(i :0..< pcVariables.size) {
+  	    	if(typeVar.contains(pcVariables.get(i).type)){ 
+  	    		if (first==0) {first=i}
+  	    		last=i
+               for (j : i+1 ..< pcVariables.size) {
+    			if(typeVar.contains(pcVariables.get(j).type)){
+ 	             imp+= creatimplVar(i, j )
+ 	    	}
+       
+        }  		
+       }   	
+    }
+	  if ( first !=last)  {imp+= creatimplVar(last, first )}   
+  	  return imp  
+  	    
+	}
+	
+	def String creatimplVar(Integer i, Integer j ){
+		  if  (pcVariables.get(i).type.equals("HappensAfter") ){ 
+ 	     	                  
+ 	     	                  switch(pcVariables.get(j).type){
+ 	     						case "HappensAfter": {
+ 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							
+ 	     							       }  	    						 
+                                 case "WhappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+										}
+ 	    						 case "ShappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+										}
+
+ 	    						 case "HappensWithin": {
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = happened)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                        }
+
+          		  						}
+          							}
+ 	     
+                if  (pcVariables.get(i).type.equals("WhappensBefore") || pcVariables.get(i).type.equals("ShappensBefore")){
+								switch(pcVariables.get(j).type){
+         
+ 	     						case "HappensAfter":{
+ 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							
+ 	     							}  
+ 	    						 
+                                 case "WhappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+ 	    						 case "ShappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+
+ 	    						 case "HappensWithin": {
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                        }
+          		
+          							}}
+ 	 
+ 	    if (pcVariables.get(i).type.equals("HappensWithin")){ 
+							switch(pcVariables.get(j).type){
+         
+ 	     						case "HappensAfter":{
+ 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							
+ 	     							}  
+ 	    						                                 
+                                 case "WhappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+ 	    						 case "ShappensBefore":{
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+
+ 	    						 case "HappensWithin": {
+                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                        }
+          		
+          							} 	    	
+ 	    }
 	}
 }
