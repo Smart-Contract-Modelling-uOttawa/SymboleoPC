@@ -1,0 +1,66 @@
+Domain ComputerC
+ Store isA Role;
+ Customer isA Role with addr: String;
+ Device isAn Enumeration(workstation, laptop, desktop);
+ Options isAn Enumeration(keyboard, mouse, monitor);
+ Computer isAn Asset with type: Device, price: Number, options: Options;
+ Ordered isAn Event with who: Customer, item: Computer, Env date: Date;
+ Delivered isAn Event with item: Computer, delAddr: String, Env date: Date;
+ Paid isAn Event with Env amount: Number;
+ PayLate isAn Event;
+ Policy isAn Event with Env amount:Number, amountmin:Number, amountmax: Number, lateAmount: Number;
+ Reimburse isAn Event with Env amount:Number;
+endDomain
+
+TimeGranularity is hours
+
+Contract ComputerContract(cust: Customer, store: Store, computer: Computer)
+ Declarations
+   ordered:     Ordered with  who := cust, item := computer;
+   delivered:   Delivered with item:= computer, delAddr := cust.addr;
+   paid:        Paid;
+   paidLateDel: Paid;
+   // The default store policy
+   policy:      Policy with amountmin:= 0.15 * computer.price,
+                amountmax:= 0.20 * computer.price, lateAmount:=0.95 * computer.price ;
+   payLateOptionChosen: PayLate;
+   deposit:   Paid;
+   reimburse: Reimburse;
+   
+ Preconditions
+	(policy.amountmin <= policy.amountmax) and (policy.amountmin >= 0);
+
+ Obligations
+   // The customer has to pay a deposit when ordering a computer following the store policy
+   oOrder: Obligation(cust, store, Happens(ordered), 
+   		Happens(deposit) and (deposit.amount <= policy.amountmax) 
+   			and (deposit.amount >= policy.amountmin));
+   // The store must deliver the sold computer within 7 days from the date of the order
+   oDel: Obligation(store, cust, Happens(ordered),
+   		WhappensBefore(delivered, Date.add(ordered.date, 7, days)));
+   // Calculate the total amount paid
+   oPaid: Happens(paid) or Happens(payLateOptionChosen)->  
+   			Obligation(store, cust, true, 
+   			Assign(paid.amount:= paid.amount + deposit.amount));
+   // The customer must pay for the computer within 10 days of the order date when the computer is delivered by the delivery due date
+   oPay: Obligation(cust, store, 
+   	      Happens(Fulfilled(obligations.oDel)),
+   	 WhappensBefore(paid, Date.add(ordered.date, 10, days)) 
+     		  and (paid.amount == computer.price) ); 
+   // The customer can pay 95% of the price of the computer if the computer is delivered after the delivery due date 
+   oPayLateD: Happens(payLateOptionChosen) ->
+            Obligation(cust, store, Happens(Activated(powers.pCancel)),
+            HappensAfter(paidLateDel, Date.add(ordered.date, 10, days)) 
+            and (paid.amount == policy.lateAmount));
+   // The customer can request reimbursement if the computer is delivered after the delivery due date 
+   oReimburse: Happens(reimburse) -> 
+        Obligation(store, cust, Happens(Activated(powers.pCancel)), 
+	    Assign(reimburse.amount:=deposit.amount; deposit.amount:=0; paid.amount:=0));
+ Powers
+  //Give the authority to the customer to request reimbursement if the computer is delivered after the delivery due date
+   pCancel: Happens(Violated(obligations.oDel)) ->
+	Power(cust, store, true, Triggered(obligations.oReimburse));
+    // Give the authority to the customer to pay only 95% of the computer price if the computer is delivered after the delivery due date
+   pLateComp: Happens(Violated(obligations.oDel)) ->
+    Power(cust, store, true, Triggered(obligations.oPayLateD));
+endContract
