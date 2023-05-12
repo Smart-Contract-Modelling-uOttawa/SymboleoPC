@@ -8,7 +8,7 @@ Domain ComputerC
  Delivered isAn Event with item: Computer, delAddr: String, Env date: Date;
  Paid isAn Event with Env amount: Number;
  PayLate isAn Event;
- Policy isAn Event with Env amount:Number, amountmin:Number, amountmax: Number, lateAmount: Number;
+ Policy isAn Event with Env amountmin:Number, amountmax: Number, lateAmount: Number;
  Reimburse isAn Event with Env amount:Number;
 endDomain
 
