@@ -209,6 +209,7 @@ class SymboleoPCGenerator {
 	val powers = new ArrayList<Power>
 	val constraints = new ArrayList<Proposition>
 	 val AssignCase = new HashMap<String, String>
+	 val pcVariablesOnly = new ArrayList<DeclarationVariable>
 	
 	val predicates = new ArrayList<SymboleoPredicate>
 	
@@ -2936,86 +2937,96 @@ def boolean ifAssign(PredicateFunction predicate){
 	}
  def String implicitConstraints(){
  	    val typeVar= new ArrayList<String>
+ 	    
  	     typeVar.add("HappensAfter")
  	     typeVar.add( "WhappensBefore")
  	     typeVar.add("ShappensBefore")
  	     typeVar.add("HappensWithin")
   	    var imp = ""
-  	    var last=0
-  	    var first=0
+  	    
   	    for(i :0..< pcVariables.size) {
   	    	if(typeVar.contains(pcVariables.get(i).type)){ 
-  	    		if (first==0) {first=i}
-  	    		last=i
-               for (j : i+1 ..< pcVariables.size) {
-    			if(typeVar.contains(pcVariables.get(j).type)){
+  	    		pcVariablesOnly.add(pcVariables.get(i))
+  	    		}
+  	    		}
+  	    		
+  	    	for(i :0..< pcVariablesOnly.size) {	
+               for (j : i+1..< pcVariablesOnly.size) {
+    		//	if(typeVar.contains(pcVariables.get(j).type)){
+    		     
  	             imp+= creatimplVar(i, j )
  	    	}
        
         }  		
-       }   	
-    }
-	  if ( first !=last)  {imp+= creatimplVar(last, first )}   
+      for (j : 0..< pcVariablesOnly.size-1) {
+    		//	if(typeVar.contains(pcVariables.get(j).type)){
+    		      var impTemp=creatimplVar(pcVariablesOnly.size-1, j )
+    		     if(!imp.contains(impTemp)) {
+ 	             		imp+= impTemp
+ 	             
+ 	             }
+ 	    	}   	
+   // imp+= creatimplVar(pcVariablesOnly.size-1, 0 )
+	    
   	  return imp  
   	    
 	}
-	
 	def String creatimplVar(Integer i, Integer j ){
-		  if  (pcVariables.get(i).type.equals("HappensAfter") ){ 
+		  if  (pcVariablesOnly.get(i).type.equals("HappensAfter") ){ 
  	     	                  
- 	     	                  switch(pcVariables.get(j).type){
+ 	     	                  switch(pcVariablesOnly.get(j).type){
  	     						case "HappensAfter": {
- 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+" ) & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state =happened )) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
  	     							
  	     							       }  	    						 
                                  case "WhappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
 										}
  	    						 case "ShappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
 										}
 
  	    						 case "HappensWithin": {
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = happened)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = happened)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
                                         }
 
           		  						}
           							}
  	     
-                if  (pcVariables.get(i).type.equals("WhappensBefore") || pcVariables.get(i).type.equals("ShappensBefore")){
-								switch(pcVariables.get(j).type){
+                if  (pcVariablesOnly.get(i).type.equals("WhappensBefore") || pcVariablesOnly.get(i).type.equals("ShappensBefore")){
+								switch(pcVariablesOnly.get(j).type){
          
  	     						case "HappensAfter":{
- 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state =happened )) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
  	     							
  	     							}  
  	    						 
                                  case "WhappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"}
  	    						 case "ShappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"}
 
  	    						 case "HappensWithin": {
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
                                         }
           		
           							}}
  	 
- 	    if (pcVariables.get(i).type.equals("HappensWithin")){ 
-							switch(pcVariables.get(j).type){
+ 	    if (pcVariablesOnly.get(i).type.equals("HappensWithin")){ 
+							switch(pcVariablesOnly.get(j).type){
          
  	     						case "HappensAfter":{
- 	     							return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state =happened )) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+ 	     							return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state =happened )) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
  	     							
  	     							}  
  	    						                                 
                                  case "WhappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"}
  	    						 case "ShappensBefore":{
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"}
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"}
 
  	    						 case "HappensWithin": {
-                                 	 return "INVAR \n (("+ pcVariables.get(i).name + ".time <  "+ pcVariables.get(j).name + ".time) & (" +pcVariables.get(j).name + ".event.state = active)) -> ( \n (" + pcVariables.get(i).name+ ".event.state = happened | " + pcVariables.get(i).name+ ".event.state = expired) )\n"
+                                 	 return "INVAR \n (("+ pcVariablesOnly.get(i).parameters.get(1).value+" <  "+ pcVariablesOnly.get(j).parameters.get(1).value+") & (" +pcVariablesOnly.get(j).parameters.get(0).value + ".event.state = active)) -> ( \n (" + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = happened | " + pcVariablesOnly.get(i).parameters.get(0).value+ ".event.state = expired) )\n"
                                         }
           		
           							} 	    	
