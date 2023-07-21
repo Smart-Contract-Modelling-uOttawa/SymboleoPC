@@ -2013,9 +2013,9 @@ def boolean ifAssign(PredicateFunction predicate){
 		if (isBase === true) {
 			val code = '''
 				«IF role.attributes.map[Attribute a | a.name].length > 0»
-					MODULE «role.name»(«role.attributes.map[Attribute a | a.name].join(',')»)
+					MODULE «role.name»(party, «role.attributes.map[Attribute a | a.name].join(',')»)
 				«ELSE»
-					MODULE «role.name»()
+					MODULE «role.name»(party)
 				«ENDIF»
 				«IF role.attributes.length > 0»
 					 DEFINE
@@ -2036,7 +2036,7 @@ def boolean ifAssign(PredicateFunction predicate){
 				«IF allAttributes.map[Attribute a | a.name].length > 0»
 					MODULE «role.name»(«allAttributes.map[Attribute a | a.name].join(',')»)
 				«ELSE»
-					MODULE «role.name»()
+					MODULE «role.name»(party)
 				«ENDIF»
 				«IF role.attributes.length > 0»
 					 DEFINE
