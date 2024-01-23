@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>~\Downloads\SymboleoPC-library.nuXmv.html</title>
+<meta name="Generator" content="Vim/9.1">
+<meta name="plugin-version" content="vim9.0_v2">
+<meta name="syntax" content="nusvm">
+<meta name="settings" content="use_css,no_foldcolumn,pre_wrap,prevent_copy=,use_input_for_pc=none">
+<meta name="colorscheme" content="none">
+<style>
+<!--
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #e5e5e5; }
+body { font-family: monospace; color: #000000; background-color: #e5e5e5; }
+* { font-size: 1em; }
+.Constant { color: #ff00ff; }
+.Special { color: #6a5acd; }
+.Statement { color: #a52a2a; font-weight: bold; }
+.Comment { color: #0000ff; }
+-->
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- OTHER CONTRACT INDEPENDENT CONCEPTS</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+
+<span class="Special">MODULE </span><span class="Constant">Timer</span>(<span class="Constant">start</span>)
+ <span class="Special">VAR</span> <span class="Constant">active1</span>  : <span class="Special">boolean</span>;
+     <span class="Constant">expired1</span> : <span class="Special">boolean</span>;
+ <span class="Special">ASSIGN</span>
+   <span class="Statement">init</span>(<span class="Constant">active1</span>)  := <span class="Constant">start</span>;
+   <span class="Statement">next</span>(<span class="Constant">active1</span>)  := (<span class="Constant">active1</span> | <span class="Constant">start</span>) ? <span class="Constant">TRUE</span> : <span class="Constant">active1</span>;
+   <span class="Statement">init</span>(<span class="Constant">expired1</span>) :=  <span class="Constant">active1</span> ? {<span class="Constant">TRUE</span>,<span class="Constant">FALSE</span>} : <span class="Constant">FALSE</span>;
+   <span class="Statement">next</span>(<span class="Constant">expired1</span>) :=  <span class="Special">case</span>
+           <span class="Constant">active1</span> &amp; !<span class="Constant">expired1</span> : {<span class="Constant">TRUE</span>,<span class="Constant">FALSE</span>};
+           <span class="Constant">expired1</span>            : <span class="Constant">TRUE</span>;
+           <span class="Constant">TRUE</span>                : <span class="Constant">FALSE</span>;
+       <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">Event</span>(<span class="Constant">start</span>)
+ <span class="Special">DEFINE</span>
+ 	<span class="Constant">_active</span>   := (<span class="Constant">state</span> = <span class="Constant">active</span>);
+ 	<span class="Constant">_inactive</span> := (<span class="Constant">state</span> = <span class="Constant">inactive</span>);
+        <span class="Constant">_happened</span> := (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+        <span class="Constant">_expired</span>  := (<span class="Constant">state</span> = <span class="Constant">expired</span>);
+ <span class="Special">VAR</span> <span class="Constant">triggered</span> : <span class="Special">boolean</span>;
+         <span class="Constant">timer</span> : <span class="Constant">Timer</span>(<span class="Constant">start</span> &amp; !<span class="Constant">_happened</span> &amp; !<span class="Constant">_expired</span>);
+         <span class="Constant">state</span> : {<span class="Constant">inactive</span>, <span class="Constant">active</span>, <span class="Constant">happened</span>, <span class="Constant">expired</span>};
+	 <span class="Constant">performer</span> : {&quot;<span class="Constant">CBEEF</span>&quot;, &quot;<span class="Constant">COSTCO</span>&quot;};
+
+ <span class="Special">ASSIGN</span>
+	<span class="Statement">next</span>(performer)	:= <span class="Special">case</span>
+		state=active &amp; start	: {&quot;CBEEF&quot;, &quot;COSTCO&quot;};
+		<span class="Constant">TRUE</span>	 		: performer;
+	<span class="Special">esac</span>;
+ <span class="Special">ASSIGN</span>
+  <span class="Statement">init</span>(triggered) := <span class="Constant">FALSE</span>;
+  <span class="Statement">next</span>(triggered) := (state=active &amp; start) ? {<span class="Constant">FALSE</span>,<span class="Constant">TRUE</span>} : <span class="Constant">FALSE</span>;
+  <span class="Statement">init</span>(state)     := inactive;
+  <span class="Statement">next</span>(state)     := <span class="Special">case</span>
+    state=inactive &amp; start 		      : active;
+    state=active &amp; start &amp; triggered &amp;
+				timer.active1 : happened;
+	state=active &amp; start &amp; timer.expired1 : expired;
+    <span class="Constant">TRUE</span>                                      : state;
+  <span class="Special">esac</span>;
+
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- 'name' is party name</span>
+<span class="Comment">-- 'removeL/R/P' releases liability, righHolder or performer position of a party</span>
+<span class="Comment">-- 'addL/R/P' adds liability, righHolder or performer position to a party</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Special">MODULE </span><span class="Constant">Party</span>(<span class="Constant">norm</span>, <span class="Constant">name</span>, <span class="Constant">removeL</span>, <span class="Constant">addL</span>, <span class="Constant">removeR</span>, <span class="Constant">addR</span>, <span class="Constant">removeP</span>, <span class="Constant">addP</span>)
+  <span class="Special">DEFINE</span>
+	<span class="Constant">_name</span> 		:= <span class="Constant">name</span>;
+	<span class="Constant">_norm</span>		:= <span class="Constant">norm</span>;
+	<span class="Constant">_is_performer</span>	:= <span class="Constant">p_state</span>=<span class="Constant">P</span>;
+	<span class="Constant">_is_liable</span>	:= <span class="Constant">l_state</span>=<span class="Constant">L</span>;
+	<span class="Constant">_is_rightHolder</span>	:= <span class="Constant">r_state</span>=<span class="Constant">R</span>;
+
+  <span class="Special">VAR</span>
+	l_state	: {Init, L};
+	r_state	: {Init, R};
+	p_state	: {Init, P};
+
+  <span class="Special">ASSIGN</span>
+	<span class="Statement">init</span>(l_state)   := Init;
+	<span class="Statement">next</span>(l_state)	:= <span class="Special">case</span>
+		l_state=Init &amp; addL	: L;
+		l_state=L &amp;removeL	: Init;
+		<span class="Constant">TRUE</span>			: l_state;
+	<span class="Special">esac</span>;
+
+  <span class="Special">ASSIGN</span>
+	<span class="Statement">init</span>(r_state) := Init;
+	<span class="Statement">next</span>(r_state) := <span class="Special">case</span>
+		r_state=Init &amp; addR : R;
+		r_state=R &amp; removeR : Init;
+		<span class="Constant">TRUE</span>		    : r_state;
+	<span class="Special">esac</span>;
+
+  <span class="Special">ASSIGN</span>
+	<span class="Statement">init</span>(p_state) := Init;
+	<span class="Statement">next</span>(p_state)	:= <span class="Special">case</span>
+		p_state=Init &amp; addP : P;
+		p_state=P &amp; removeP : Init;
+		<span class="Constant">TRUE</span>		    : p_state;
+	<span class="Special">esac</span>;
+
+  <span class="Special">INVAR</span>
+	!(addL &amp; removeL) &amp;
+	!(addR &amp; removeR) &amp;
+	!(addP &amp; removeP) &amp;
+	!(_is_rightHolder &amp; _is_liable);
+
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- 'cnt_in_effect'    indicates if the contract is in inEffect state</span>
+<span class="Comment">-- 'power_suspended'  indicates if a power suspends the obligation</span>
+<span class="Comment">-- 'cnt_suspended'    indicates if the contract suspension suspends the obligation</span>
+<span class="Comment">-- 'power_resumed'    indicates if a power resumption resumes the obligation</span>
+<span class="Comment">-- 'cnt_resumed'      indicates if the contract resumption resumes the obligation</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Special">MODULE </span><span class="Constant">Obligation</span>(<span class="Constant">name</span>, <span class="Constant">surviving</span>, <span class="Constant">cnt_in_effect</span>, <span class="Constant">cnt_untermination</span>,
+                  <span class="Constant">fulfilled</span>, <span class="Constant">triggered</span>, <span class="Constant">violated</span>, <span class="Constant">activated</span>,
+				  <span class="Constant">expired1</span>, <span class="Constant">power_suspended</span>, <span class="Constant">cnt_suspended</span>, <span class="Constant">terminated</span>, <span class="Constant">power_resumed</span>,
+				  <span class="Constant">cnt_resumed</span>, <span class="Constant">discharged</span>, <span class="Constant">antecedent</span>)
+  <span class="Special">DEFINE</span>
+	<span class="Constant">_name</span> 		:= <span class="Constant">name</span>;
+	<span class="Constant">_surviving</span>	:= <span class="Constant">surviving</span>;
+	<span class="Constant">_suspended</span> 	:= (<span class="Constant">power_suspended</span> | (<span class="Constant">cnt_suspended</span> &amp; !<span class="Constant">surviving</span>));
+	<span class="Constant">_active</span> 	:= (<span class="Constant">state</span> = <span class="Constant">inEffect</span> | <span class="Constant">state</span> = <span class="Constant">suspension</span>);
+
+  <span class="Special">VAR</span>
+	<span class="Constant">state</span> 		: {<span class="Constant">not_created</span>, <span class="Constant">create</span>, <span class="Constant">inEffect</span>, <span class="Constant">suspension</span>, <span class="Constant">discharge</span>,
+			   <span class="Constant">fulfillment</span>, <span class="Constant">violation</span>, <span class="Constant">unsTermination</span>};
+	<span class="Constant">sus_state</span>	: {<span class="Constant">not_suspended</span>, <span class="Constant">sus_by_contract</span>, <span class="Constant">sus_by_power</span>};
+
+  <span class="Special">ASSIGN</span>
+ <span class="Comment">--NEW: update axioms(surviving obligations are not suspended! informally mentioned)</span>
+	<span class="Statement">init</span>(sus_state) := not_suspended;
+	<span class="Statement">next</span>(sus_state)	:= <span class="Special">case</span>
+		sus_state=not_suspended &amp; !surviving &amp; cnt_suspended 	: sus_by_contract;
+		sus_state=sus_by_contract &amp; !surviving &amp; cnt_resumed	: not_suspended;
+		sus_state=not_suspended &amp; !surviving &amp; power_suspended 	: sus_by_power;
+		sus_state=sus_by_power &amp; !surviving &amp; power_resumed	: not_suspended;
+		<span class="Constant">TRUE</span>							: sus_state;
+	<span class="Special">esac</span>;
+
+  <span class="Special">ASSIGN</span>
+    <span class="Statement">init</span>(state) := not_created;
+    <span class="Statement">next</span>(state) := <span class="Special">case</span>
+		cnt_in_effect &amp; state=not_created   &amp; triggered &amp; !antecedent : create;
+		cnt_in_effect &amp; state=not_created   &amp; triggered &amp; antecedent  : inEffect;
+		cnt_in_effect &amp; state=create        &amp; antecedent              : inEffect;
+		cnt_in_effect &amp; state=create        &amp; (expired1 | discharged) : discharge;
+		cnt_in_effect &amp; state=inEffect      &amp; fulfilled               : fulfillment;
+		cnt_in_effect &amp; state=inEffect      &amp; _suspended              : suspension;
+		cnt_in_effect &amp; state=inEffect      &amp; violated                : violation;
+		cnt_in_effect &amp; _active             &amp; terminated              : unsTermination;
+		cnt_untermination &amp; !surviving      &amp; _active     	      : unsTermination;
+		sus_state=sus_by_contract &amp; state=suspension  &amp; cnt_resumed   : inEffect;
+		sus_state=sus_by_power	  &amp; state=suspension  &amp; power_resumed : inEffect;
+		<span class="Constant">TRUE</span>                                                  	      : state;
+	<span class="Special">esac</span>;
+
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- 'cnt_in_effect'   indicates if the contract is in inEffect state</span>
+<span class="Comment">-- 'power_suspended' indicates if a power suspends the power</span>
+<span class="Comment">-- 'cnt_suspended'   indicates if the contract suspension suspends the power</span>
+<span class="Comment">-- 'power_resumed'   indicates if a power resumption resumes the power</span>
+<span class="Comment">-- 'cnt_resumed'     indicates if the contract resumption resumes the power</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Special">MODULE </span><span class="Constant">Power</span>(<span class="Constant">name</span>, <span class="Constant">cnt_in_effect</span>, <span class="Constant">triggered</span>, <span class="Constant">activated</span>, <span class="Constant">expired1</span>, <span class="Constant">power_suspended</span>, <span class="Constant">cnt_suspended</span>,
+       	     <span class="Constant">terminated</span>, <span class="Constant">exerted</span>, <span class="Constant">power_resumed</span>, <span class="Constant">cnt_resumed</span>, <span class="Constant">antecedent</span>)
+  <span class="Special">DEFINE</span>
+	<span class="Constant">_name</span>		 := <span class="Constant">name</span>;
+	<span class="Constant">_active</span> 	 := (<span class="Constant">state</span> = <span class="Constant">inEffect</span> | <span class="Constant">state</span> = <span class="Constant">suspension</span>);
+	<span class="Constant">_suspended</span> 	 := (<span class="Constant">power_suspended</span> | <span class="Constant">cnt_suspended</span>);
+
+  <span class="Special">VAR</span>
+	state 		: {not_created, create, inEffect, suspension, sTermination, unsTermination};
+	sus_state	: {not_suspended, sus_by_contract, sus_by_power};
+
+  <span class="Special">ASSIGN</span>
+	<span class="Statement">init</span>(sus_state) := not_suspended;
+	<span class="Statement">next</span>(sus_state)	:= <span class="Special">case</span>
+		sus_state=not_suspended &amp; cnt_suspended 	: sus_by_contract;
+		sus_state=sus_by_contract &amp; cnt_resumed		: not_suspended;
+		sus_state=not_suspended &amp; power_suspended 	: sus_by_power;
+		sus_state=sus_by_power &amp; power_resumed		: not_suspended;
+		<span class="Constant">TRUE</span>						: sus_state;
+	<span class="Special">esac</span>;
+
+  <span class="Special">ASSIGN</span>
+   <span class="Statement">init</span>(state) := not_created;
+   <span class="Statement">next</span>(state) := <span class="Special">case</span>
+     cnt_in_effect &amp; state = not_created 	&amp; triggered &amp; !antecedent : create;
+     cnt_in_effect &amp; state = not_created 	&amp; triggered &amp; antecedent  : inEffect;
+     cnt_in_effect &amp; state = create      	&amp; antecedent              : inEffect;
+     cnt_in_effect &amp; state = create      	&amp; expired1                : unsTermination;
+     cnt_in_effect &amp; state = inEffect    	&amp; exerted                 : sTermination;
+     cnt_in_effect &amp; state = inEffect   	&amp; _suspended              : suspension;
+     cnt_in_effect &amp; state = inEffect    	&amp; expired1                : unsTermination;
+     cnt_in_effect &amp; _active  			&amp; terminated              : unsTermination;
+
+     sus_state=sus_by_contract	&amp; state=suspension  &amp; cnt_resumed 	  : inEffect;
+     sus_state=sus_by_power	&amp; state=suspension  &amp; power_resumed       : inEffect;
+
+     <span class="Constant">TRUE</span>                             				   	  : state;
+   <span class="Special">esac</span>;
+
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- 'assigned_party'				 indicates if a party is assigned to a role</span>
+<span class="Comment">-- 'revoked_party'				 indicates if a party is unassigned from a role</span>
+<span class="Comment">-- 'fulfilled_active_obligation' indicates if all active obligations are fulfilled</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Special">MODULE </span><span class="Constant">Contract</span>(<span class="Constant">triggered</span>, <span class="Constant">activated</span>, <span class="Constant">terminated</span>, <span class="Constant">suspended</span>, <span class="Constant">resumed</span>,
+				<span class="Constant">revoked_party</span>, <span class="Constant">assigned_party</span>, <span class="Constant">fulfilled_active_obligation</span>)
+  <span class="Special">DEFINE</span>
+	<span class="Constant">_active</span>      := (<span class="Constant">state</span> = <span class="Constant">unassign</span> | <span class="Constant">state</span> = <span class="Constant">inEffect</span> | <span class="Constant">state</span> = <span class="Constant">suspension</span>);
+	<span class="Constant">_termination</span> := (<span class="Constant">state</span> = <span class="Constant">sTermination</span> | <span class="Constant">state</span> = <span class="Constant">unsTermination</span>);
+
+	<span class="Comment">-- obligations/powers' status changes once the contract goes to inEffect state</span>
+	_o_activated := (state = form &amp; activated) |
+						(state = suspension &amp; resumed) |
+						(state = unassign &amp; assigned_party) |
+						(state = inEffect);
+
+  <span class="Special">VAR</span>
+	state : { not_created, form, inEffect, suspension, unassign, sTermination, unsTermination};
+
+  <span class="Special">ASSIGN</span>
+    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_created</span>;
+    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+		<span class="Constant">state</span> = <span class="Constant">not_created</span> &amp; <span class="Constant">triggered</span>  			: <span class="Constant">form</span>;
+		<span class="Constant">state</span> = <span class="Constant">form</span>        &amp; <span class="Constant">activated</span>  			: <span class="Constant">inEffect</span>;
+		<span class="Constant">state</span> = <span class="Constant">inEffect</span>    &amp; <span class="Constant">fulfilled_active_obligation</span>  	: <span class="Constant">sTermination</span>;
+		<span class="Constant">state</span> = <span class="Constant">inEffect</span>    &amp; <span class="Constant">suspended</span>  			: <span class="Constant">suspension</span>;
+		<span class="Constant">state</span> = <span class="Constant">inEffect</span>    &amp; <span class="Constant">revoked_party</span>  			: <span class="Constant">unassign</span>;
+		<span class="Constant">state</span> = <span class="Constant">inEffect</span>    &amp; <span class="Constant">terminated</span> 			: <span class="Constant">unsTermination</span>;
+		<span class="Constant">state</span> = <span class="Constant">suspension</span>  &amp; <span class="Constant">resumed</span>    			: <span class="Constant">inEffect</span>;
+		<span class="Constant">state</span> = <span class="Constant">suspension</span>  &amp; <span class="Constant">terminated</span> 			: <span class="Constant">unsTermination</span>;
+		<span class="Constant">state</span> = <span class="Constant">unassign</span>    &amp; <span class="Constant">assigned_party</span> 			: <span class="Constant">inEffect</span>;
+		<span class="Constant">state</span> = <span class="Constant">unassign</span>    &amp; <span class="Constant">terminated</span> 			: <span class="Constant">unsTermination</span>;
+		<span class="Constant">TRUE</span>                             			: <span class="Constant">state</span>;
+    <span class="Special">esac</span>;
+
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Comment">-- OTHER CONTRACT INDEPENDENT CONCEPTS</span>
+<span class="Comment">--------------------------------------------------------------------------------------</span>
+<span class="Special">MODULE </span><span class="Constant">Role</span>(<span class="Constant">party</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_party</span> := <span class="Constant">party</span>;
+
+<span class="Special">MODULE </span><span class="Constant">Asset</span>(<span class="Constant">owner</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_owner</span> := <span class="Constant">owner</span>;
+
+<span class="Special">MODULE </span><span class="Constant">Situation</span>(<span class="Constant">proposition</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_holds</span> := <span class="Constant">proposition</span>;
+
+<span class="Comment">-- WhappensBefore(e,t), ShappensBefore(e,t) are HappensAfter(e,t) are simulated as Happens(e,t) 		 </span>
+<span class="Special">MODULE </span><span class="Constant">WhappensBefore</span>(<span class="Constant">event</span>, <span class="Constant">time</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+        <span class="Constant">_true</span> 	:= (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">not_happened</span>, <span class="Constant">happened</span>};
+	<span class="Special">ASSIGN</span>
+	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+	    		<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) : <span class="Constant">happened</span>;
+	    		<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">ShappensBefore</span>(<span class="Constant">event</span>, <span class="Constant">time</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+	<span class="Constant">_true</span>   := (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">not_happened</span>, <span class="Constant">happened</span>};
+	<span class="Special">ASSIGN</span>
+	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+			<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) : <span class="Constant">happened</span>;
+			<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">HappensAfter</span>(<span class="Constant">event</span>, <span class="Constant">time</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+	<span class="Constant">_true</span>   := (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">not_happened</span>, <span class="Constant">happened</span>};
+	<span class="Special">ASSIGN</span>
+	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+			<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) : <span class="Constant">happened</span>;
+			<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">WhappensBeforeE</span>(<span class="Constant">event1</span>, <span class="Constant">event2</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+	<span class="Constant">_true</span>   := (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">not_happened</span>, <span class="Constant">happened</span>};
+	<span class="Special">ASSIGN</span>
+	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+			<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event1</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event1</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) &amp; !(<span class="Statement">next</span>(<span class="Constant">event2_happened</span>)) : <span class="Constant">happened</span>;
+			<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">ShappensBeforeE</span>(<span class="Constant">event1</span>, <span class="Constant">event2</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+        <span class="Constant">_true</span> 	:= (<span class="Constant">state</span> = <span class="Constant">ev1_ev2_happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">not_happened</span>, <span class="Constant">ev1_happened</span>, <span class="Constant">ev1_ev2_happened</span>};
+ 	<span class="Special">ASSIGN</span>
+   	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+    	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+			<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event1</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event1</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) &amp; !(<span class="Statement">next</span>(<span class="Constant">event2</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>)) : <span class="Constant">ev1_happened</span>;
+			<span class="Constant">state</span> = <span class="Constant">ev1_happened</span> &amp; <span class="Constant">event2</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event2</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) : <span class="Constant">ev1_ev2_happened</span>;
+			<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">HappensWithin</span>(<span class="Constant">event</span>, <span class="Constant">situation</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+        <span class="Constant">_true</span> 	:= (<span class="Constant">state</span> = <span class="Constant">happened</span>);
+ <span class="Special">VAR</span> <span class="Constant">state</span>: {<span class="Constant">happened</span>, <span class="Constant">not_happened</span>};
+ 	<span class="Special">ASSIGN</span>
+    	    <span class="Statement">init</span>(<span class="Constant">state</span>) := <span class="Constant">not_happened</span>;
+    	    <span class="Statement">next</span>(<span class="Constant">state</span>) := <span class="Special">case</span>
+			<span class="Constant">state</span> = <span class="Constant">not_happened</span> &amp; <span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_active</span> &amp; <span class="Statement">next</span>(<span class="Constant">event</span>.<span class="Constant">event</span>.<span class="Constant">_happened</span>) &amp; <span class="Constant">situation</span>.<span class="Constant">_holds</span> : <span class="Constant">happened</span>;
+			<span class="Constant">TRUE</span> : <span class="Constant">state</span>;
+		    <span class="Special">esac</span>;
+
+<span class="Special">MODULE </span><span class="Constant">HappensAfterE</span>(<span class="Constant">event1</span>, <span class="Constant">event2</span>)
+ <span class="Special">DEFINE</span> <span class="Constant">_false</span>  := (<span class="Constant">state</span> = <span class="Constant">not_happened</span>);
+        <span class="Constant">_true</span>   := (<span class="Constant">state</span> = <span class="Constant">ev2_ev1_happened</span>);
+
+ <span class="Special">VAR</span> state: {not_happened, ev2_happened, ev2_ev1_happened};
+ 	<span class="Special">ASSIGN</span>
+    	    <span class="Statement">init</span>(state) := not_happened;
+    	    <span class="Statement">next</span>(state) := <span class="Special">case</span>
+			state = not_happened &amp; !(<span class="Statement">next</span>(event1_happened)) &amp; event2.event._active &amp; <span class="Statement">next</span>(event2.event._happened) : ev2_happened;
+			state = ev2_happened &amp; event1.event._active &amp; <span class="Statement">next</span>(event1.event._happened) : ev2_ev1_happened;
+			<span class="Constant">TRUE</span> : state;
+		    <span class="Special">esac</span>;
+
+</pre>
+</body>
+</html>
+<!-- vim: set foldmethod=manual : -->
