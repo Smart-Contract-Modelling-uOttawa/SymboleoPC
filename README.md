@@ -1,3 +1,4 @@
+# This is the old version If you want you can visit the new one here -> [NewLink](https://github.com/Smart-Contract-Modelling-uOttawa/Symboleo2SC-SymboleoPC-Combined)
 # Symboleo Text Editor
 [![DOI](https://zenodo.org/badge/263478039.svg)](https://zenodo.org/badge/latestdoi/263478039)
 
