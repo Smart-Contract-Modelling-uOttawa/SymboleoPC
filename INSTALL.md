@@ -2,7 +2,7 @@
 Please follow the instructions below.
 
 ## Requirements
-- Eclipse 2019-09R or later
+- Eclipse 2019-09R or later (Please select Eclipse Modelling tool to install)
 - Download the latest Xtext plugin [Instructions](https://www.eclipse.org/Xtext/download.html)
 
 ## Instructions
